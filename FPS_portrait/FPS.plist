@@ -1,7 +1,13 @@
 {
     Filter =     {
         Bundles =         (
-            "com.facebook.Facebook"
+            "jp.co.cygames.umamusume",
+            "app.papaya2933.cheetah1054",
+            "com.komoe.kmumamusumegp",
+            "com.komoe.umamusumeofficial",
+            "com.kakaogames.umamusume",
+            "com.bilibili.umamusu",
+            "com.cygames.umamusume"
         );
     };
 }

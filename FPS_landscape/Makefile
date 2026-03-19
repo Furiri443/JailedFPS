@@ -1,8 +1,9 @@
-ARCHS = arm64 arm64e
+ARCHS = arm64
 DEBUG = 0
 FINALPACKAGE = 1
 FOR_RELEASE = 1
 IGNORE_WARNINGS=0
+THEOS_PACKAGE_SCHEME=rootless
 
 
 include $(THEOS)/makefiles/common.mk

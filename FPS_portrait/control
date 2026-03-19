@@ -2,7 +2,7 @@ Package: com.34306.fps
 Name: FPS Counter
 Depends: mobilesubstrate
 Version: 1.0
-Architecture: iphoneos-arm
+Architecture: iphoneos-arm64
 Description: A simple tweak that show FPS ingame.
 Maintainer: Little 34306
 Author: 34306

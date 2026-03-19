@@ -1,0 +1,46 @@
+name: Build .deb (Rootless)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos
+        run: |
+          export THEOS=$HOME/theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
+
+          # Download iOS SDKs
+          curl -sL https://github.com/theos/sdks/archive/master.tar.gz \
+            | tar xz -C $THEOS/sdks --strip-components=1
+
+      - name: Build FPS_landscape
+        run: |
+          export THEOS=$HOME/theos
+          cd FPS_landscape
+          make clean
+          make package FINALPACKAGE=1
+
+      - name: Build FPS_portrait
+        run: |
+          export THEOS=$HOME/theos
+          cd FPS_portrait
+          make clean
+          make package FINALPACKAGE=1
+
+      - name: Upload .deb artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-rootless-debs
+          path: |
+            FPS_landscape/packages/*.deb
+            FPS_portrait/packages/*.deb
+          retention-days: 90
