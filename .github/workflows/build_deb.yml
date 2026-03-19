@@ -15,6 +15,9 @@ jobs:
 
       - name: Setup Theos
         run: |
+          # Install ldid for code signing
+          brew install ldid
+
           export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
 
