@@ -14,6 +14,7 @@ $(TWEAK_NAME)_CFLAGS = -fobjc-arc
 $(TWEAK_NAME)_CCFLAGS = -std=c++11 -fno-rtti -fno-exceptions -DNDEBUG
 
 $(TWEAK_NAME)_FILES = Tweak.xm
+$(TWEAK_NAME)_FRAMEWORKS = UIKit QuartzCore
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 include $(THEOS_MAKE_PATH)/aggregate.mk
