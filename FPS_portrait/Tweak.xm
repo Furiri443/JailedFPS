@@ -1,7 +1,6 @@
 #import <UIKit/UIKit.h>
-#import <substrate.h>
 #import <objc/runtime.h>
-
+#import <QuartzCore/CAMetalLayer.h>
 
 static dispatch_source_t _timer;
 static UILabel *fpsLabel;
@@ -14,27 +13,32 @@ static void startRefreshTimer(){
 
     dispatch_source_set_event_handler(_timer, ^{
     	[fpsLabel setText:[NSString stringWithFormat:@"%.1lf",FPSPerSecond]];
-
-    	NSLog(@"%.1lf",FPSPerSecond);
-
     });
     dispatch_resume(_timer); 
 }
 
 #pragma mark ui
-#define kFPSLabelWidth 50
-#define kFPSLabelHeight 20
+#define kFPSLabelWidth 55
+#define kFPSLabelHeight 22
 %group ui
 %hook UIWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
 	static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        fpsLabel= [[UILabel alloc] initWithFrame:CGRectMake(285, 25, kFPSLabelWidth, kFPSLabelHeight)];
-        fpsLabel.font=[UIFont fontWithName:@"Helvetica-Bold" size:16];
-        fpsLabel.textAlignment=NSTextAlignmentRight;
-        fpsLabel.userInteractionEnabled=NO;
+        CGRect screenBounds = [[UIScreen mainScreen] bounds];
+        CGFloat x = screenBounds.size.width - kFPSLabelWidth - 10;
+        CGFloat y = 50; // below status bar / notch
 
-        UIColor *color = [UIColor colorWithRed: 0.99 green: 0.80 blue: 0.00 alpha: 1.00];
+        fpsLabel = [[UILabel alloc] initWithFrame:CGRectMake(x, y, kFPSLabelWidth, kFPSLabelHeight)];
+        fpsLabel.font = [UIFont fontWithName:@"Helvetica-Bold" size:16];
+        fpsLabel.textAlignment = NSTextAlignmentRight;
+        fpsLabel.userInteractionEnabled = NO;
+        fpsLabel.layer.zPosition = MAXFLOAT;
+        fpsLabel.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.3];
+        fpsLabel.layer.cornerRadius = 4;
+        fpsLabel.clipsToBounds = YES;
+
+        UIColor *color = [UIColor colorWithRed:0.99 green:0.80 blue:0.00 alpha:1.00];
 		[fpsLabel setTextColor:color];
 
         [self addSubview:fpsLabel];
@@ -86,19 +90,13 @@ void frameTick(){
 %end
 
 #pragma mark metal
+// Hook CAMetalLayer instead of CAMetalDrawable (which is a protocol)
 %group metal
-%hook CAMetalDrawable
-- (void)present{
-	%orig;
+%hook CAMetalLayer
+- (id)nextDrawable{
+	id drawable = %orig;
 	frameTick();
-}
-- (void)presentAfterMinimumDuration:(CFTimeInterval)duration{
-	%orig;
-	frameTick();
-}
-- (void)presentAtTime:(CFTimeInterval)presentationTime{
-	%orig;
-	frameTick();
+	return drawable;
 }
 %end
 %end
