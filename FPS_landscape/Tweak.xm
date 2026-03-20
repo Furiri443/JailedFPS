@@ -52,7 +52,7 @@ static float getFreeMemoryMB() {
 	mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
 	kern_return_t kr = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vmstat, &count);
 	if (kr != KERN_SUCCESS) return 0;
-	natural_t pageSize;
+	vm_size_t pageSize;
 	host_page_size(host, &pageSize);
 	return (vmstat.free_count + vmstat.purgeable_count) * (float)pageSize / (1024.0 * 1024.0);
 }
@@ -119,7 +119,6 @@ static void startRefreshTimer(){
         
         UIFont *font = [UIFont fontWithName:@"Menlo-Bold" size:11];
         UIColor *defaultColor = [UIColor colorWithRed:0.99 green:0.80 blue:0.00 alpha:1.0];
-        UIColor *labelColor = [UIColor colorWithWhite:0.65 alpha:1.0];
         
         // FPS row
         fpsLabel = [[UILabel alloc] initWithFrame:CGRectMake(kPadding, kPadding, kOverlayWidth - kPadding*2, kRowHeight)];
