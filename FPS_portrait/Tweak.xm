@@ -5,6 +5,7 @@
 #import <sys/sysctl.h>
 #import <dlfcn.h>
 #import <sys/utsname.h>
+#import <mach-o/dyld.h>
 
 static dispatch_source_t _timer;
 static UILabel *fpsLabel;
