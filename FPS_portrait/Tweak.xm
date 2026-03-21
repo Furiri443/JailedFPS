@@ -296,7 +296,7 @@ static void setupWatermark() {
 		watermark.layer.zPosition = MAXFLOAT;
 		
 		UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
-		UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.25];
+		UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.55];
 		
 		NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"N/A";
 		NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
