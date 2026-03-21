@@ -19,13 +19,51 @@ static NSString *getMachineIdentifier() {
 	return [NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
 }
 
-// ─── Jailbreak Method Detection ───
-static NSString *getJailbreakMethod() {
-	if (dlopen("/usr/lib/libElleKit.dylib", RTLD_NOLOAD)) return @"ElleKit";
-	if (dlopen("/usr/lib/libhooker.dylib", RTLD_NOLOAD)) return @"libhooker";
-	if (dlopen("/usr/lib/libsubstitute.dylib", RTLD_NOLOAD)) return @"Substitute";
-	if (dlopen("/Library/MobileSubstrate/MobileSubstrate.dylib", RTLD_NOLOAD)) return @"Substrate";
-	return @"Unknown";
+// ─── Jailbreak Tool Detection ───
+static NSString *getJailbreakTool() {
+	NSFileManager *fm = [NSFileManager defaultManager];
+	
+	if ([fm fileExistsAtPath:@"/var/jb/.installed_dopamine"]) return @"Dopamine";
+	if ([fm fileExistsAtPath:@"/var/jb/.installed_fugu15max"]) return @"Fugu15";
+	if ([fm fileExistsAtPath:@"/var/jb/.installed_xina15"]) return @"XinaA15";
+	if ([fm fileExistsAtPath:@"/var/Liy/.procursus_strapped"]) return @"XinaA15 • Legacy";
+	
+	if ([fm fileExistsAtPath:@"/cores/jbloader"]) return @"palera1n";
+	if ([fm fileExistsAtPath:@"/jbin/post.sh"]) return @"palera1n • Legacy";
+	if ([fm fileExistsAtPath:@"/cores/binpack/.installed_overlay"]) return @"bakera1n";
+	
+	if ([fm fileExistsAtPath:@"/var/checkra1n.dmg"]) return @"checkra1n";
+	
+	if ([fm fileExistsAtPath:@"/.installed_unc0ver"]) return @"unc0ver";
+	if ([fm fileExistsAtPath:@"/taurine/jailbreakd"]) return @"Taurine";
+	if ([fm fileExistsAtPath:@"/odyssey/jailbreakd"]) return @"Odyssey";
+	if ([fm fileExistsAtPath:@"/chimera/jailbreakd"]) return @"Chimera";
+	if ([fm fileExistsAtPath:@"/electra/jailbreakd"]) return @"Electra";
+	if ([fm fileExistsAtPath:@"/.installed_apex"]) return @"Apex";
+	if ([fm fileExistsAtPath:@"/.installed_amethyst"]) return @"Amethyst";
+
+	// Fallback detection logic if the standard ones fail
+	if ([fm fileExistsAtPath:@"/var/jb/usr/bin/dopamine"] || [fm fileExistsAtPath:@"/var/jb/basebin/dopamine_pfUtility"]) return @"Dopamine";
+	if ([fm fileExistsAtPath:@"/var/jb/.procursus_strapped"] && [fm fileExistsAtPath:@"/var/jb/usr/libexec/roothide"]) return @"Roothide";
+
+	return @"Unknown JB";
+}
+
+// ─── Hooking Library Detection ───
+static NSString *getHookingLibrary() {
+	NSString *hooker = @"Unknown Hook";
+	uint32_t count = _dyld_image_count();
+	for (uint32_t i = 0; i < count; i++) {
+		const char *imageName = _dyld_get_image_name(i);
+		if (!imageName) continue;
+		NSString *path = [NSString stringWithUTF8String:imageName];
+		
+		if ([path containsString:@"libElleKit.dylib"]) return @"ElleKit";
+		if ([path containsString:@"libhooker.dylib"]) return @"libhooker";
+		if ([path containsString:@"libsubstitute.dylib"]) return @"Substitute";
+		if ([path containsString:@"MobileSubstrate.dylib"] || [path containsString:@"libsubstrate.dylib"]) return @"Substrate";
+	}
+	return hooker;
 }
 
 // ─── Jailbreak Type Detection ───
@@ -263,7 +301,8 @@ static void setupWatermark() {
 		NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
 			?: [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"]
 			?: @"N/A";
-		NSString *jbMethod = getJailbreakMethod();
+		NSString *jbTool = getJailbreakTool();
+		NSString *jbHook = getHookingLibrary();
 		NSString *jbType = getJailbreakType();
 		NSString *machine = getMachineIdentifier();
 		NSString *model = [[UIDevice currentDevice] model];
@@ -271,8 +310,8 @@ static void setupWatermark() {
 		NSArray *labels = @[
 			[NSString stringWithFormat:@"Bundle: %@", bundleID],
 			[NSString stringWithFormat:@"App: %@", appName],
-			[NSString stringWithFormat:@"Hook: %@", jbMethod],
-			[NSString stringWithFormat:@"Type: %@", jbType],
+			[NSString stringWithFormat:@"Tool: %@ (%@)", jbTool, jbType],
+			[NSString stringWithFormat:@"Hook: %@", jbHook],
 			[NSString stringWithFormat:@"Device: %@ (%@)", model, machine]
 		];
 		
