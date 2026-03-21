@@ -3,12 +3,37 @@
 #import <QuartzCore/CAMetalLayer.h>
 #import <mach/mach.h>
 #import <sys/sysctl.h>
+#import <dlfcn.h>
+#import <sys/utsname.h>
 
 static dispatch_source_t _timer;
 static UILabel *fpsLabel;
 static UILabel *cpuLabel;
 static UILabel *ramLabel;
 static UILabel *batteryLabel;
+
+// ─── Device Machine ID ───
+static NSString *getMachineIdentifier() {
+	struct utsname systemInfo;
+	uname(&systemInfo);
+	return [NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
+}
+
+// ─── Jailbreak Method Detection ───
+static NSString *getJailbreakMethod() {
+	if (dlopen("/usr/lib/libElleKit.dylib", RTLD_NOLOAD)) return @"ElleKit";
+	if (dlopen("/usr/lib/libhooker.dylib", RTLD_NOLOAD)) return @"libhooker";
+	if (dlopen("/usr/lib/libsubstitute.dylib", RTLD_NOLOAD)) return @"Substitute";
+	if (dlopen("/Library/MobileSubstrate/MobileSubstrate.dylib", RTLD_NOLOAD)) return @"Substrate";
+	return @"Unknown";
+}
+
+// ─── Jailbreak Type Detection ───
+static NSString *getJailbreakType() {
+	// Rootless jailbreaks use /var/jb as prefix
+	BOOL isRootless = [[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb"];
+	return isRootless ? @"Rootless" : @"Rootful";
+}
 
 double FPSPerSecond = 0;
 
@@ -97,6 +122,10 @@ static void startRefreshTimer(){
 #define kOverlayWidth 130
 #define kRowHeight 18
 #define kPadding 6
+#define kWatermarkWidth 220
+#define kWatermarkRowHeight 14
+#define kWatermarkPadding 5
+#define kWatermarkRows 5
 %group ui
 %hook UIWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
@@ -148,6 +177,55 @@ static void startRefreshTimer(){
         [container addSubview:batteryLabel];
         
         [self addSubview:container];
+        
+        // ─── Watermark (top-left) ───
+        CGFloat wmX = 10;
+        CGFloat wmY = 50;
+        CGFloat wmHeight = kWatermarkRowHeight * kWatermarkRows + kWatermarkPadding * 2;
+        UIView *watermark = [[UIView alloc] initWithFrame:CGRectMake(wmX, wmY, kWatermarkWidth, wmHeight)];
+        watermark.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.45];
+        watermark.layer.cornerRadius = 8;
+        watermark.clipsToBounds = YES;
+        watermark.userInteractionEnabled = NO;
+        watermark.layer.zPosition = MAXFLOAT;
+        
+        UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
+        UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.40];
+        
+        NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"N/A";
+        NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
+            ?: [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"]
+            ?: @"N/A";
+        NSString *jbMethod = getJailbreakMethod();
+        NSString *jbType = getJailbreakType();
+        NSString *machine = getMachineIdentifier();
+        NSString *model = [[UIDevice currentDevice] model];
+        
+        NSArray *labels = @[
+            [NSString stringWithFormat:@"Bundle: %@", bundleID],
+            [NSString stringWithFormat:@"App: %@", appName],
+            [NSString stringWithFormat:@"Hook: %@", jbMethod],
+            [NSString stringWithFormat:@"Type: %@", jbType],
+            [NSString stringWithFormat:@"Device: %@ (%@)", model, machine]
+        ];
+        
+        for (NSUInteger i = 0; i < labels.count; i++) {
+            UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(
+                kWatermarkPadding,
+                kWatermarkPadding + kWatermarkRowHeight * i,
+                kWatermarkWidth - kWatermarkPadding * 2,
+                kWatermarkRowHeight
+            )];
+            lbl.font = wmFont;
+            lbl.textColor = wmColor;
+            lbl.text = labels[i];
+            lbl.adjustsFontSizeToFitWidth = YES;
+            lbl.minimumScaleFactor = 0.7;
+            [watermark addSubview:lbl];
+        }
+        
+        [self addSubview:watermark];
+        
         startRefreshTimer();
     });
 	return %orig;
