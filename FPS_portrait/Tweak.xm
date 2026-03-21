@@ -240,22 +240,10 @@ void frameTick(){
 // ─── Watermark (bottom-left, no background, loads immediately) ───
 static void setupWatermark() {
 	dispatch_async(dispatch_get_main_queue(), ^{
-		UIWindow *window = nil;
-		for (UIScene *scene in [[UIApplication sharedApplication] connectedScenes]) {
-			if ([scene isKindOfClass:[UIWindowScene class]]) {
-				for (UIWindow *w in [(UIWindowScene *)scene windows]) {
-					if (w.isKeyWindow) { window = w; break; }
-				}
-			}
-			if (window) break;
-		}
-		if (!window) {
-			// Fallback for older iOS
-			#pragma clang diagnostic push
-			#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-			window = [[UIApplication sharedApplication] keyWindow];
-			#pragma clang diagnostic pop
-		}
+		#pragma clang diagnostic push
+		#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+		UIWindow *window = [[UIApplication sharedApplication] keyWindow];
+		#pragma clang diagnostic pop
 		if (!window) return;
 		
 		CGRect screenBounds = [[UIScreen mainScreen] bounds];
