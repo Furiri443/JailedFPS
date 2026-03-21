@@ -177,55 +177,6 @@ static void startRefreshTimer(){
         [container addSubview:batteryLabel];
         
         [self addSubview:container];
-        
-        // ─── Watermark (top-left) ───
-        CGFloat wmX = 10;
-        CGFloat wmY = 50;
-        CGFloat wmHeight = kWatermarkRowHeight * kWatermarkRows + kWatermarkPadding * 2;
-        UIView *watermark = [[UIView alloc] initWithFrame:CGRectMake(wmX, wmY, kWatermarkWidth, wmHeight)];
-        watermark.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.45];
-        watermark.layer.cornerRadius = 8;
-        watermark.clipsToBounds = YES;
-        watermark.userInteractionEnabled = NO;
-        watermark.layer.zPosition = MAXFLOAT;
-        
-        UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
-        UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.40];
-        
-        NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"N/A";
-        NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
-            ?: [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"]
-            ?: @"N/A";
-        NSString *jbMethod = getJailbreakMethod();
-        NSString *jbType = getJailbreakType();
-        NSString *machine = getMachineIdentifier();
-        NSString *model = [[UIDevice currentDevice] model];
-        
-        NSArray *labels = @[
-            [NSString stringWithFormat:@"Bundle: %@", bundleID],
-            [NSString stringWithFormat:@"App: %@", appName],
-            [NSString stringWithFormat:@"Hook: %@", jbMethod],
-            [NSString stringWithFormat:@"Type: %@", jbType],
-            [NSString stringWithFormat:@"Device: %@ (%@)", model, machine]
-        ];
-        
-        for (NSUInteger i = 0; i < labels.count; i++) {
-            UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(
-                kWatermarkPadding,
-                kWatermarkPadding + kWatermarkRowHeight * i,
-                kWatermarkWidth - kWatermarkPadding * 2,
-                kWatermarkRowHeight
-            )];
-            lbl.font = wmFont;
-            lbl.textColor = wmColor;
-            lbl.text = labels[i];
-            lbl.adjustsFontSizeToFitWidth = YES;
-            lbl.minimumScaleFactor = 0.7;
-            [watermark addSubview:lbl];
-        }
-        
-        [self addSubview:watermark];
-        
         startRefreshTimer();
     });
 	return %orig;
@@ -286,10 +237,86 @@ void frameTick(){
 %end
 
 
+// ─── Watermark (bottom-left, no background, loads immediately) ───
+static void setupWatermark() {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIWindow *window = nil;
+		for (UIScene *scene in [[UIApplication sharedApplication] connectedScenes]) {
+			if ([scene isKindOfClass:[UIWindowScene class]]) {
+				for (UIWindow *w in [(UIWindowScene *)scene windows]) {
+					if (w.isKeyWindow) { window = w; break; }
+				}
+			}
+			if (window) break;
+		}
+		if (!window) {
+			// Fallback for older iOS
+			#pragma clang diagnostic push
+			#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+			window = [[UIApplication sharedApplication] keyWindow];
+			#pragma clang diagnostic pop
+		}
+		if (!window) return;
+		
+		CGRect screenBounds = [[UIScreen mainScreen] bounds];
+		CGFloat wmHeight = kWatermarkRowHeight * kWatermarkRows + kWatermarkPadding * 2;
+		CGFloat wmX = 10;
+		CGFloat wmY = screenBounds.size.height - wmHeight - 30; // bottom-left, above home indicator
+		
+		UIView *watermark = [[UIView alloc] initWithFrame:CGRectMake(wmX, wmY, kWatermarkWidth, wmHeight)];
+		watermark.backgroundColor = [UIColor clearColor];
+		watermark.userInteractionEnabled = NO;
+		watermark.layer.zPosition = MAXFLOAT;
+		
+		UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
+		UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.40];
+		
+		NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"N/A";
+		NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
+			?: [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"]
+			?: @"N/A";
+		NSString *jbMethod = getJailbreakMethod();
+		NSString *jbType = getJailbreakType();
+		NSString *machine = getMachineIdentifier();
+		NSString *model = [[UIDevice currentDevice] model];
+		
+		NSArray *labels = @[
+			[NSString stringWithFormat:@"Bundle: %@", bundleID],
+			[NSString stringWithFormat:@"App: %@", appName],
+			[NSString stringWithFormat:@"Hook: %@", jbMethod],
+			[NSString stringWithFormat:@"Type: %@", jbType],
+			[NSString stringWithFormat:@"Device: %@ (%@)", model, machine]
+		];
+		
+		for (NSUInteger i = 0; i < labels.count; i++) {
+			UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(
+				kWatermarkPadding,
+				kWatermarkPadding + kWatermarkRowHeight * i,
+				kWatermarkWidth - kWatermarkPadding * 2,
+				kWatermarkRowHeight
+			)];
+			lbl.font = wmFont;
+			lbl.textColor = wmColor;
+			lbl.text = labels[i];
+			lbl.adjustsFontSizeToFitWidth = YES;
+			lbl.minimumScaleFactor = 0.7;
+			[watermark addSubview:lbl];
+		}
+		
+		[window addSubview:watermark];
+	});
+}
+
 %ctor{
 	NSLog(@"ctor: FPSIndicator");
 
 	%init(ui);
 	%init(gl);
 	%init(metal);
+	
+	// Show watermark immediately when app finishes launching
+	[[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
+		object:nil queue:nil usingBlock:^(NSNotification *note) {
+			setupWatermark();
+	}];
 }
