@@ -173,8 +173,7 @@ static void startRefreshTimer(){
         [[UIDevice currentDevice] setBatteryMonitoringEnabled:YES];
         
         CGRect screenBounds = [[UIScreen mainScreen] bounds];
-        CGFloat maxDim = MAX(screenBounds.size.width, screenBounds.size.height);
-        CGFloat x = maxDim - kOverlayWidth - 10;
+        CGFloat x = screenBounds.size.width - kOverlayWidth - 10;
         CGFloat y = 12;
         
         // Container view
