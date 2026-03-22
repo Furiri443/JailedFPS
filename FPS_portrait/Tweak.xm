@@ -95,6 +95,7 @@ static float getCPUUsage() {
 			if (!(basic->flags & TH_FLAGS_IDLE))
 				total += basic->cpu_usage / (float)TH_USAGE_SCALE * 100.0;
 		}
+		mach_port_deallocate(mach_task_self(), thread_list[i]);
 	}
 	vm_deallocate(mach_task_self(), (vm_offset_t)thread_list, thread_count * sizeof(thread_t));
 	return total;
@@ -123,7 +124,7 @@ static float getFreeMemoryMB() {
 
 static void startRefreshTimer(){
 	_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    dispatch_source_set_timer(_timer, dispatch_walltime(NULL, 0), (1.0/5.0) * NSEC_PER_SEC, 0);
+    dispatch_source_set_timer(_timer, dispatch_walltime(NULL, 0), (1.0/2.0) * NSEC_PER_SEC, 0);
 
     dispatch_source_set_event_handler(_timer, ^{
     	[fpsLabel setText:[NSString stringWithFormat:@"%.0f FPS",FPSPerSecond]];
