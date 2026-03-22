@@ -3,12 +3,76 @@
 #import <QuartzCore/CAMetalLayer.h>
 #import <mach/mach.h>
 #import <sys/sysctl.h>
+#import <dlfcn.h>
+#import <sys/utsname.h>
+#import <mach-o/dyld.h>
 
 static dispatch_source_t _timer;
 static UILabel *fpsLabel;
 static UILabel *cpuLabel;
 static UILabel *ramLabel;
 static UILabel *batteryLabel;
+
+// ─── Device Machine ID ───
+static NSString *getMachineIdentifier() {
+	struct utsname systemInfo;
+	uname(&systemInfo);
+	return [NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
+}
+
+// ─── Jailbreak Tool Detection ───
+static NSString *getJailbreakTool() {
+	NSFileManager *fm = [NSFileManager defaultManager];
+	
+	if ([fm fileExistsAtPath:@"/var/jb/.installed_dopamine"]) return @"Dopamine";
+	if ([fm fileExistsAtPath:@"/var/jb/.installed_fugu15max"]) return @"Fugu15";
+	if ([fm fileExistsAtPath:@"/var/jb/.installed_xina15"]) return @"XinaA15";
+	if ([fm fileExistsAtPath:@"/var/Liy/.procursus_strapped"]) return @"XinaA15 • Legacy";
+	
+	if ([fm fileExistsAtPath:@"/cores/jbloader"]) return @"palera1n";
+	if ([fm fileExistsAtPath:@"/jbin/post.sh"]) return @"palera1n • Legacy";
+	if ([fm fileExistsAtPath:@"/cores/binpack/.installed_overlay"]) return @"bakera1n";
+	
+	if ([fm fileExistsAtPath:@"/var/checkra1n.dmg"]) return @"checkra1n";
+	
+	if ([fm fileExistsAtPath:@"/.installed_unc0ver"]) return @"unc0ver";
+	if ([fm fileExistsAtPath:@"/taurine/jailbreakd"]) return @"Taurine";
+	if ([fm fileExistsAtPath:@"/odyssey/jailbreakd"]) return @"Odyssey";
+	if ([fm fileExistsAtPath:@"/chimera/jailbreakd"]) return @"Chimera";
+	if ([fm fileExistsAtPath:@"/electra/jailbreakd"]) return @"Electra";
+	if ([fm fileExistsAtPath:@"/.installed_apex"]) return @"Apex";
+	if ([fm fileExistsAtPath:@"/.installed_amethyst"]) return @"Amethyst";
+
+	// Fallback detection logic if the standard ones fail
+	if ([fm fileExistsAtPath:@"/var/jb/usr/bin/dopamine"] || [fm fileExistsAtPath:@"/var/jb/basebin/dopamine_pfUtility"]) return @"Dopamine";
+	if ([fm fileExistsAtPath:@"/var/jb/.procursus_strapped"] && [fm fileExistsAtPath:@"/var/jb/usr/libexec/roothide"]) return @"Roothide";
+
+	return @"Unknown JB";
+}
+
+// ─── Hooking Library Detection ───
+static NSString *getHookingLibrary() {
+	NSString *hooker = @"Unknown Hook";
+	uint32_t count = _dyld_image_count();
+	for (uint32_t i = 0; i < count; i++) {
+		const char *imageName = _dyld_get_image_name(i);
+		if (!imageName) continue;
+		NSString *path = [NSString stringWithUTF8String:imageName];
+		
+		if ([path containsString:@"libElleKit.dylib"]) return @"ElleKit";
+		if ([path containsString:@"libhooker.dylib"]) return @"libhooker";
+		if ([path containsString:@"libsubstitute.dylib"]) return @"Substitute";
+		if ([path containsString:@"MobileSubstrate.dylib"] || [path containsString:@"libsubstrate.dylib"]) return @"Substrate";
+	}
+	return hooker;
+}
+
+// ─── Jailbreak Type Detection ───
+static NSString *getJailbreakType() {
+	// Rootless jailbreaks use /var/jb as prefix
+	BOOL isRootless = [[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb"];
+	return isRootless ? @"Rootless" : @"Rootful";
+}
 
 double FPSPerSecond = 0;
 
@@ -97,6 +161,10 @@ static void startRefreshTimer(){
 #define kOverlayWidth 130
 #define kRowHeight 18
 #define kPadding 6
+#define kWatermarkWidth 220
+#define kWatermarkRowHeight 14
+#define kWatermarkPadding 5
+#define kWatermarkRows 5
 %group ui
 %hook UIWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
@@ -209,10 +277,81 @@ void frameTick(){
 %end
 
 
+// ─── Watermark (bottom-left, no background, loads immediately) ───
+static void setupWatermark() {
+	// Delay 3s to avoid blocking scene-create watchdog (10s limit)
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+		// All file system checks run on background thread
+		NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"N/A";
+		NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
+			?: [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"]
+			?: @"N/A";
+		NSString *jbTool = getJailbreakTool();
+		NSString *jbHook = getHookingLibrary();
+		NSString *jbType = getJailbreakType();
+		NSString *machine = getMachineIdentifier();
+		NSString *model = [[UIDevice currentDevice] model];
+		
+		NSArray *labels = @[
+			[NSString stringWithFormat:@"Bundle: %@", bundleID],
+			[NSString stringWithFormat:@"App: %@", appName],
+			[NSString stringWithFormat:@"Tool: %@ (%@)", jbTool, jbType],
+			[NSString stringWithFormat:@"Hook: %@", jbHook],
+			[NSString stringWithFormat:@"Device: %@ (%@)", model, machine]
+		];
+		
+		// UI work on main thread
+		dispatch_async(dispatch_get_main_queue(), ^{
+			#pragma clang diagnostic push
+			#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+			UIWindow *window = [[UIApplication sharedApplication] keyWindow];
+			#pragma clang diagnostic pop
+			if (!window) return;
+			
+			CGRect screenBounds = [[UIScreen mainScreen] bounds];
+			CGFloat minDim = MIN(screenBounds.size.width, screenBounds.size.height);
+			CGFloat wmHeight = kWatermarkRowHeight * kWatermarkRows + kWatermarkPadding * 2;
+			CGFloat wmX = 10;
+			CGFloat wmY = minDim - wmHeight - 30;
+			
+			UIView *watermark = [[UIView alloc] initWithFrame:CGRectMake(wmX, wmY, kWatermarkWidth, wmHeight)];
+			watermark.backgroundColor = [UIColor clearColor];
+			watermark.userInteractionEnabled = NO;
+			watermark.layer.zPosition = MAXFLOAT;
+			
+			UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
+			UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.55];
+			
+			for (NSUInteger i = 0; i < labels.count; i++) {
+				UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(
+					kWatermarkPadding,
+					kWatermarkPadding + kWatermarkRowHeight * i,
+					kWatermarkWidth - kWatermarkPadding * 2,
+					kWatermarkRowHeight
+				)];
+				lbl.font = wmFont;
+				lbl.textColor = wmColor;
+				lbl.text = labels[i];
+				lbl.adjustsFontSizeToFitWidth = YES;
+				lbl.minimumScaleFactor = 0.7;
+				[watermark addSubview:lbl];
+			}
+			
+			[window addSubview:watermark];
+		});
+	});
+}
+
 %ctor{
 	NSLog(@"ctor: FPSIndicator");
 
 	%init(ui);
 	%init(gl);
 	%init(metal);
+	
+	// Show watermark immediately when app finishes launching
+	[[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
+		object:nil queue:nil usingBlock:^(NSNotification *note) {
+			setupWatermark();
+	}];
 }
