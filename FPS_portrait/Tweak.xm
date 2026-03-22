@@ -278,26 +278,9 @@ void frameTick(){
 
 // ─── Watermark (bottom-left, no background, loads immediately) ───
 static void setupWatermark() {
-	dispatch_async(dispatch_get_main_queue(), ^{
-		#pragma clang diagnostic push
-		#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-		UIWindow *window = [[UIApplication sharedApplication] keyWindow];
-		#pragma clang diagnostic pop
-		if (!window) return;
-		
-		CGRect screenBounds = [[UIScreen mainScreen] bounds];
-		CGFloat wmHeight = kWatermarkRowHeight * kWatermarkRows + kWatermarkPadding * 2;
-		CGFloat wmX = 10;
-		CGFloat wmY = screenBounds.size.height - wmHeight - 30; // bottom-left, above home indicator
-		
-		UIView *watermark = [[UIView alloc] initWithFrame:CGRectMake(wmX, wmY, kWatermarkWidth, wmHeight)];
-		watermark.backgroundColor = [UIColor clearColor];
-		watermark.userInteractionEnabled = NO;
-		watermark.layer.zPosition = MAXFLOAT;
-		
-		UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
-		UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.55];
-		
+	// Delay 3s to avoid blocking scene-create watchdog (10s limit)
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+		// All file system checks run on background thread
 		NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"N/A";
 		NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"]
 			?: [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"]
@@ -316,22 +299,44 @@ static void setupWatermark() {
 			[NSString stringWithFormat:@"Device: %@ (%@)", model, machine]
 		];
 		
-		for (NSUInteger i = 0; i < labels.count; i++) {
-			UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(
-				kWatermarkPadding,
-				kWatermarkPadding + kWatermarkRowHeight * i,
-				kWatermarkWidth - kWatermarkPadding * 2,
-				kWatermarkRowHeight
-			)];
-			lbl.font = wmFont;
-			lbl.textColor = wmColor;
-			lbl.text = labels[i];
-			lbl.adjustsFontSizeToFitWidth = YES;
-			lbl.minimumScaleFactor = 0.7;
-			[watermark addSubview:lbl];
-		}
-		
-		[window addSubview:watermark];
+		// UI work on main thread
+		dispatch_async(dispatch_get_main_queue(), ^{
+			#pragma clang diagnostic push
+			#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+			UIWindow *window = [[UIApplication sharedApplication] keyWindow];
+			#pragma clang diagnostic pop
+			if (!window) return;
+			
+			CGRect screenBounds = [[UIScreen mainScreen] bounds];
+			CGFloat wmHeight = kWatermarkRowHeight * kWatermarkRows + kWatermarkPadding * 2;
+			CGFloat wmX = 10;
+			CGFloat wmY = screenBounds.size.height - wmHeight - 30;
+			
+			UIView *watermark = [[UIView alloc] initWithFrame:CGRectMake(wmX, wmY, kWatermarkWidth, wmHeight)];
+			watermark.backgroundColor = [UIColor clearColor];
+			watermark.userInteractionEnabled = NO;
+			watermark.layer.zPosition = MAXFLOAT;
+			
+			UIFont *wmFont = [UIFont fontWithName:@"Menlo" size:9];
+			UIColor *wmColor = [UIColor colorWithWhite:1.0 alpha:0.55];
+			
+			for (NSUInteger i = 0; i < labels.count; i++) {
+				UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(
+					kWatermarkPadding,
+					kWatermarkPadding + kWatermarkRowHeight * i,
+					kWatermarkWidth - kWatermarkPadding * 2,
+					kWatermarkRowHeight
+				)];
+				lbl.font = wmFont;
+				lbl.textColor = wmColor;
+				lbl.text = labels[i];
+				lbl.adjustsFontSizeToFitWidth = YES;
+				lbl.minimumScaleFactor = 0.7;
+				[watermark addSubview:lbl];
+			}
+			
+			[window addSubview:watermark];
+		});
 	});
 }
 
